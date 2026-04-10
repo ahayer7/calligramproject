@@ -24,7 +24,7 @@ def clean_words(words):
 st.title("Concrete Poetry Studio")
 st.write(
     "Upload a text file, then drag words around the canvas to create a concrete poem. "
-    "Click a word to resize it, rotate it, recolor it, or edit it."
+    "You can start from the poem's original layout or from a scattered layout."
 )
 
 uploaded_file = st.file_uploader("Upload a .txt file", type=["txt"])
@@ -33,11 +33,11 @@ default_text = """Concrete poetry bends language into visible form.
 Words can scatter, collapse, climb, tilt, float, fracture, bloom, and echo across the page."""
 
 use_sample = st.checkbox("Use sample text if no file is uploaded", value=True)
-
-canvas_width = st.slider("Canvas width", 700, 1600, 1100, 50)
-canvas_height = st.slider("Canvas height", 500, 1200, 700, 50)
 background_color = st.color_picker("Canvas background color", "#ffffff")
 default_text_color = st.color_picker("Default word color", "#111111")
+
+canvas_width = 1100
+canvas_height = 700
 
 if uploaded_file is not None:
     text = uploaded_file.read().decode("utf-8", errors="ignore")
@@ -46,18 +46,19 @@ elif use_sample:
 else:
     text = ""
 
-words = clean_words(extract_words(text))
-
-if not words:
+if not text.strip():
     st.info("Upload a text file or enable sample text to begin.")
     st.stop()
 
-max_words = st.slider("Maximum number of words to place on canvas", 10, min(len(words), 300), min(len(words), 80))
-words = words[:max_words]
+words = clean_words(extract_words(text))
 
-initial_words = []
+if not words:
+    st.info("The text file does not contain readable words.")
+    st.stop()
+
+random_words_layout = []
 for i, word in enumerate(words):
-    initial_words.append(
+    random_words_layout.append(
         {
             "id": i,
             "text": word,
@@ -71,7 +72,38 @@ for i, word in enumerate(words):
         }
     )
 
-words_json = json.dumps(initial_words)
+original_layout = []
+line_spacing = 52
+word_spacing_factor = 0.62
+left_margin = 30
+top_margin = 30
+current_id = 0
+
+for line_index, line in enumerate(text.splitlines()):
+    line_words = clean_words(extract_words(line))
+    x_cursor = left_margin
+    y_cursor = top_margin + (line_index * line_spacing)
+
+    for word in line_words:
+        approx_width = max(20, int(len(word) * 24 * word_spacing_factor))
+        original_layout.append(
+            {
+                "id": current_id,
+                "text": word,
+                "x": x_cursor,
+                "y": y_cursor,
+                "size": 24,
+                "rotation": 0,
+                "color": default_text_color,
+                "z": current_id + 1,
+                "fontFamily": "Arial, sans-serif",
+            }
+        )
+        x_cursor += approx_width + 12
+        current_id += 1
+
+random_words_json = json.dumps(random_words_layout)
+original_layout_json = json.dumps(original_layout)
 
 html_code = f"""
 <!DOCTYPE html>
@@ -226,6 +258,11 @@ html_code = f"""
         <p>Click a word on the canvas, then change its appearance or move it by dragging.</p>
 
         <div class="control-group">
+            <button id="pasteOriginalBtn">Paste Poem in Original Form</button>
+            <button id="scatterBtn">Scatter Words Randomly</button>
+        </div>
+
+        <div class="control-group">
             <label for="wordText">Selected word text</label>
             <input type="text" id="wordText" placeholder="No word selected" />
         </div>
@@ -274,10 +311,10 @@ html_code = f"""
 
         <div class="small-note">
             Tips:<br>
+            • Use "Paste Poem in Original Form" to begin with the poem laid out normally.<br>
             • Drag words to move them.<br>
             • Click a word to edit it.<br>
-            • Use large and rotated text to create concrete shapes.<br>
-            • Download HTML if you want a shareable visual version.
+            • Use large and rotated text to create concrete shapes.
         </div>
 
         <div class="status" id="status"></div>
@@ -289,8 +326,10 @@ html_code = f"""
 </div>
 
 <script>
-    const initialWords = {words_json};
-    let words = JSON.parse(JSON.stringify(initialWords));
+    const randomStartWords = {random_words_json};
+    const originalLayoutWords = {original_layout_json};
+
+    let words = JSON.parse(JSON.stringify(randomStartWords));
     let selectedId = null;
     let currentZ = words.length + 1;
 
@@ -365,6 +404,15 @@ html_code = f"""
 
         refreshAllWords();
         updateStatus(`Selected: "${{word.text}}"`);
+    }}
+
+    function replaceLayout(newLayout, statusMessage) {{
+        words = JSON.parse(JSON.stringify(newLayout));
+        selectedId = null;
+        currentZ = words.length + 1;
+        wordTextInput.value = "";
+        renderWords();
+        updateStatus(statusMessage);
     }}
 
     canvas.addEventListener("pointerdown", (e) => {{
@@ -495,6 +543,14 @@ html_code = f"""
         applyWordStyle(el, word);
     }});
 
+    document.getElementById("pasteOriginalBtn").addEventListener("click", () => {{
+        replaceLayout(originalLayoutWords, "Poem placed in original form");
+    }});
+
+    document.getElementById("scatterBtn").addEventListener("click", () => {{
+        replaceLayout(randomStartWords, "Words scattered randomly");
+    }});
+
     document.getElementById("bringFrontBtn").addEventListener("click", () => {{
         if (selectedId === null) return;
         const word = getWordById(selectedId);
@@ -532,12 +588,7 @@ html_code = f"""
     }});
 
     document.getElementById("resetBtn").addEventListener("click", () => {{
-        words = JSON.parse(JSON.stringify(initialWords));
-        selectedId = null;
-        currentZ = words.length + 1;
-        wordTextInput.value = "";
-        renderWords();
-        updateStatus("Reset to starting layout");
+        replaceLayout(randomStartWords, "Reset to starting scattered layout");
     }});
 
     function buildHtmlExport() {{
