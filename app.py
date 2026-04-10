@@ -29,8 +29,7 @@ st.write(
 
 uploaded_file = st.file_uploader("Upload a .txt file", type=["txt"])
 
-default_text = """Concrete poetry bends language into visible form.
-Words can scatter, collapse, climb, tilt, float, fracture, bloom, and echo across the page."""
+default_text = """Concrete poetry bends language into visible form."""
 
 use_sample = st.checkbox("Use sample text if no file is uploaded", value=True)
 background_color = st.color_picker("Canvas background color", "#ffffff")
@@ -314,7 +313,7 @@ html_code = f"""
             • Use "Paste Poem in Original Form" to begin with the poem laid out normally.<br>
             • Drag words to move them.<br>
             • Click a word to edit it.<br>
-            • Use large and rotated text to create concrete shapes.
+            • The typographic arrangement on the page should reflect the content of the poem.
         </div>
 
         <div class="status" id="status"></div>
